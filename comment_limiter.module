@@ -1,0 +1,109 @@
+<?php
+//Validates length of the comment
+function _comment_limiter_max_length_validate($element, &$form_state){
+  $settings=variable_get('comment_limiter_node_settings',array());
+  if($settings[$form_state['node']->nid]['max_length'] && $settings[$form_state['node']->nid]['max_length'] < strlen($element['#value'])) {
+    form_set_error('comment_max_length', t('Your comment is too long, the max allowed length is !maxlength characters',array('!maxlength'=>$settings[$form_state['node']->nid]['max_length'])));
+  }
+}
+
+//Validates the specified max length
+function _comment_limiter_node_settings_validate($element, &$form_state) {
+  if($element['#value']!='' && !is_numeric($element['#value'])){
+    form_set_error('comment_max_length', t('You must specify a number or no value for comment max length'));
+  }
+}
+
+//Applies any settings for the node, to the comment form
+function comment_limiter_form_comment_form_alter(&$form, $form_state){
+  $settings=variable_get('comment_limiter_node_settings',array());
+  //Applies max length
+  if($settings[$form['nid']['#value']]['max_length']) {
+    $form['comment_filter']['comment']['#attributes']['comment_max_length']=$settings[$form['nid']['#value']]['max_length'];
+    $form['comment_filter']['comment']['#element_validate'] = array('_comment_limiter_max_length_validate');
+
+    $cols= $form['comment_filter']['comment']['#cols'] ? $form['comment_filter']['comment']['#cols'] : 60;
+    if ($form['comment_filter']['comment']['#rows'] > $settings[$form['nid']['#value']]['max_length']/$cols) {
+      $form['comment_filter']['comment']['#rows']=ceil($settings[$form['nid']['#value']]['max_length']/$cols);
+    }
+    drupal_add_js(array(
+        'comment_limiter'=> array(
+            'chars_left'=>t('Characters left'),
+        )
+      )
+    ,'setting');
+    drupal_add_js(drupal_get_path('module', 'comment_limiter') . '/comment_limiter.js');
+    drupal_add_js(drupal_get_path('module', 'comment_limiter') . '/jquery.textchange.min.js');
+    drupal_add_css(drupal_get_path('module', 'comment_limiter') . '/comment_limiter.css');
+  }
+  //Removes subject field
+  if($settings[$form['nid']['#value']]['no_subject']){
+    $form['subject']['#type']='hidden';
+    $form['subject']['#value']='<comment_limiter_none>';
+  }
+}
+
+//Adds comment limiter fields to node edit form
+function comment_limiter_form_alter($form, $form_state, $form_id) {
+  if (isset($form['type']) && $form['type']['#value'] .'_node_form' == $form_id){
+    $settings=variable_get('comment_limiter_node_settings',array());
+
+    $form['comment_settings']['comment_max_length'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Maximum comment length'),
+      '#default_value' => $settings[$form['nid']['#value']]['max_length'],
+      '#size' => 3,
+      '#description' => t('Enter the maxumum comment length.'),
+      '#weight' => -1,
+      '#element_validate' => array('_comment_limiter_node_settings_validate'),
+    );
+    
+    $form['comment_settings']['comment_no_subject'] = array(
+      '#type' => 'checkbox',
+      '#title' => t('Exclude subject'),
+      '#default_value' => $settings[$form['nid']['#value']]['no_subject'],
+      '#description' => t('Check this box to exclude the subject field from the comments.'),
+    );
+  }
+}
+
+//Saves the comment limiter settings for the node
+function comment_limiter_nodeapi(&$node, $op){
+  switch($op){
+    case 'insert':
+    case 'update':
+      $settings=variable_get('comment_limiter_node_settings',array());
+      if($node->comment_max_length || $node->comment_no_subject){
+        //update the comment_max_length 
+        $settings[$node->nid]=array();
+        if($node->comment_max_length){
+          $settings[$node->nid]['max_length']=$node->comment_max_length ;
+        }
+        if($node->comment_no_subject){
+          $settings[$node->nid]['no_subject']=$node->comment_no_subject ;
+        }
+        variable_set('comment_limiter_node_settings',$settings);
+      }
+      //remove all settings about the node if none specified
+      else if(array_key_exists($node->nid, $settings)){
+        unset($settings[$node->nid]);
+        variable_set('comment_limiter_node_settings',$settings);
+      }
+      break;
+    case 'delete':
+      //remove all settings about the node when deleted
+      $settings=variable_get('comment_limiter_node_settings',array());
+      if(array_key_exists($node->nid, $settings)){
+        unset($settings[$node->nid]);
+        variable_set('comment_limiter_node_settings',$settings);
+      }
+      break;
+  }
+}
+
+//Clears subject field when value is <none>
+function comment_limiter_preprocess_comment(&$vars){
+  if($vars['comment']->subject=='<comment_limiter_none>'){
+    $vars['comment']->subject='';
+  }
+}

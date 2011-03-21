@@ -1,0 +1,5 @@
+div#comment_limiter_counter {
+  display:none;
+  border:1px solid black;
+  width:150px;
+}

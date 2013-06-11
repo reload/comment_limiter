@@ -32,8 +32,8 @@ function comment_limiter_form_comment_form_alter(&$form, &$form_state){
         )
       )
     ,'setting');
-    drupal_add_js(drupal_get_path('module', 'comment_limiter') . '/comment_limiter.js');
-    drupal_add_js(drupal_get_path('module', 'comment_limiter') . '/jquery.textchange.min.js');
+    drupal_add_js(drupal_get_path('module', 'comment_limiter') . '/js/comment_limiter.js');
+    drupal_add_js(drupal_get_path('module', 'comment_limiter') . '/js/contrib/jquery.textchange.min.js');
     drupal_add_css(drupal_get_path('module', 'comment_limiter') . '/comment_limiter.css');
   }
   //Removes subject field
